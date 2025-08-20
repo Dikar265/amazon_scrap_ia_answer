@@ -1,0 +1,56 @@
+services:
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: scrap-llm_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    networks:
+      - scrap-net
+  db:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: products
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+    networks:
+      - scrap-net
+
+  web:
+    build: .
+    container_name: scrap-api
+    restart: always
+    depends_on:
+      - ollama
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    networks:
+      - scrap-net
+
+volumes:
+  postgres_data:
+  ollama_data:
+
+networks:
+  scrap-net:
+    driver: bridge
